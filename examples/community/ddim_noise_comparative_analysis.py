@@ -96,9 +96,7 @@ class DDIMNoiseComparativeAnalysisPipeline(DiffusionPipeline):
         # get latents
         print("add noise to latents at timestep", timestep)
         init_latents = self.scheduler.add_noise(init_latents, noise, timestep)
-        latents = init_latents
-
-        return latents
+        return init_latents
 
     @torch.no_grad()
     def __call__(
@@ -184,7 +182,8 @@ class DDIMNoiseComparativeAnalysisPipeline(DiffusionPipeline):
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 
-        if not return_dict:
-            return (image, latent_timestep.item())
-
-        return ImagePipelineOutput(images=image)
+        return (
+            ImagePipelineOutput(images=image)
+            if return_dict
+            else (image, latent_timestep.item())
+        )

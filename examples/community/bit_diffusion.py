@@ -126,10 +126,13 @@ def ddim_bit_scheduler_step(
 
         prev_sample = prev_sample + variance
 
-    if not return_dict:
-        return (prev_sample,)
-
-    return DDIMSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
+    return (
+        DDIMSchedulerOutput(
+            prev_sample=prev_sample, pred_original_sample=pred_original_sample
+        )
+        if return_dict
+        else (prev_sample,)
+    )
 
 
 def ddpm_bit_scheduler_step(
@@ -204,10 +207,14 @@ def ddpm_bit_scheduler_step(
 
     pred_prev_sample = pred_prev_sample + variance
 
-    if not return_dict:
-        return (pred_prev_sample,)
-
-    return DDPMSchedulerOutput(prev_sample=pred_prev_sample, pred_original_sample=pred_original_sample)
+    return (
+        DDPMSchedulerOutput(
+            prev_sample=pred_prev_sample,
+            pred_original_sample=pred_original_sample,
+        )
+        if return_dict
+        else (pred_prev_sample,)
+    )
 
 
 class BitDiffusion(DiffusionPipeline):
@@ -258,7 +265,4 @@ class BitDiffusion(DiffusionPipeline):
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 
-        if not return_dict:
-            return (image,)
-
-        return ImagePipelineOutput(images=image)
+        return ImagePipelineOutput(images=image) if return_dict else (image, )

@@ -264,11 +264,11 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
                 )
             else:
                 latents = torch.randn(latents_shape, generator=generator, device=self.device, dtype=latents_dtype)
-        else:
-            if latents.shape != latents_shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
+        elif latents.shape == latents_shape:
             latents = latents.to(self.device)
 
+        else:
+            raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
         # set timesteps
         accepts_offset = "offset" in set(inspect.signature(self.scheduler.set_timesteps).parameters.keys())
         extra_set_kwargs = {}
@@ -341,7 +341,8 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 
-        if not return_dict:
-            return (image, None)
-
-        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=None)
+        return (
+            StableDiffusionPipelineOutput(images=image, nsfw_content_detected=None)
+            if return_dict
+            else (image, None)
+        )
