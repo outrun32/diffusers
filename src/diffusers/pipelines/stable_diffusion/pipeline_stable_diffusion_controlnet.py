@@ -531,8 +531,10 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline, TextualInversionLoade
         negative_prompt=None,
         prompt_embeds=None,
         negative_prompt_embeds=None,
+        controlnet_guidance_start=None,
+        controlnet_guidance_end=None,
         controlnet_conditioning_scale=1.0,
-    ):
+        ):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
@@ -800,6 +802,8 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline, TextualInversionLoade
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         controlnet_conditioning_scale: Union[float, List[float]] = 1.0,
         guess_mode: bool = False,
+        controlnet_guidance_start: float = 0.0,
+        controlnet_guidance_end: float = 1.0,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -898,6 +902,8 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline, TextualInversionLoade
             negative_prompt,
             prompt_embeds,
             negative_prompt_embeds,
+            controlnet_guidance_start,
+            controlnet_guidance_end,
             controlnet_conditioning_scale,
         )
 
@@ -1011,21 +1017,30 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline, TextualInversionLoade
                 else:
                     controlnet_latent_model_input = latent_model_input
                     controlnet_prompt_embeds = prompt_embeds
+                
+                #Outrun32: 2023-05-03
+                #compute the percentage of total steps we are at
+                current_sampling_percent = i/len(timesteps)
 
-                down_block_res_samples, mid_block_res_sample = self.controlnet(
-                    controlnet_latent_model_input,
-                    t,
-                    encoder_hidden_states=controlnet_prompt_embeds,
-                    controlnet_cond=image,
-                    conditioning_scale=controlnet_conditioning_scale,
-                    guess_mode=guess_mode,
-                    return_dict=False,
-                )
+                if(current_sampling_percent < controlnet_guidance_start or current_sampling_percent > controlnet_guidance_end):
+                    #if we are not in the range of the controlnet guidance, we don't need to run it
+                    down_block_res_samples = None #[torch.zeros_like(latent_model_input) for _ in range(self.unet.config.num_down_blocks)]
+                    mid_block_res_sample = None #torch.zeros_like(latent_model_input)
+                else:
+                    down_block_res_samples, mid_block_res_sample = self.controlnet(
+                        controlnet_latent_model_input,
+                        t,
+                        encoder_hidden_states=controlnet_prompt_embeds,
+                        controlnet_cond=image,
+                        conditioning_scale=controlnet_conditioning_scale,
+                        guess_mode=guess_mode,
+                        return_dict=False,
+                    )
 
-                if guess_mode and do_classifier_free_guidance:
-                    # Infered ControlNet only for the conditional batch.
-                    # To apply the output of ControlNet to both the unconditional and conditional batches,
-                    # add 0 to the unconditional batch to keep it unchanged.
+                if guess_mode and do_classifier_free_guidance and controlnet_guidance_end < 1.0 and controlnet_guidance_start > 0.0:
+                    # # Infered ControlNet only for the conditional batch.
+                    # # To apply the output of ControlNet to both the unconditional and conditional batches,
+                    # # add 0 to the unconditional batch to keep it unchanged.
                     down_block_res_samples = [torch.cat([torch.zeros_like(d), d]) for d in down_block_res_samples]
                     mid_block_res_sample = torch.cat([torch.zeros_like(mid_block_res_sample), mid_block_res_sample])
 
